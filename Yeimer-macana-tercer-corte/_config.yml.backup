@@ -1,0 +1,33 @@
+title: "Blog de Analítica Avanzada - Maria Fernanda"
+description: "Análisis de Flujo de Datos Simulado con Spark"
+theme: jekyll-theme-cayman
+baseurl: "/maria_herazo_trabajo-tercer_corte"
+url: "https://MariaFer2006.github.io"
+markdown: kramdown
+
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+exclude:
+  - generate_graphs.py
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - .gitignore
+
+  ### **2. Crear `.gitignore` (si no existe)**
+
+Crea un archivo llamado `.gitignore` en la raíz del proyecto con este contenido:
+```
+_site/
+.sass-cache/
+.jekyll-cache/
+.jekyll-metadata
+vendor/
+*.pyc
+__pycache__/
+Gemfile.lock
+.DS_Store

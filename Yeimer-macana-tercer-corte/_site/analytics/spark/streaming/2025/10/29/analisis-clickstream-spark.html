@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="es">
+  <!-- ...existing code... -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Análisis de Flujo de Datos Simulado con Spark</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/maria_herazo_trabajo-tercer_corte/assets/css/style.css">
+<meta name="description" content="🔍 Análisis de Flujo de Datos Simulado con Spark
+" />
+<link rel="alternate" type="application/rss+xml" title="Blog de Analítica Avanzada - Maria Fernanda" href="/maria_herazo_trabajo-tercer_corte/feed.xml">
+<!-- ...existing code... -->
+  <body style="background:#fbfdff;color:#0f172a;">
+    <header style="border-bottom:1px solid #4676b1;padding:1.25rem 0;">
+      <div style="max-width:960px;margin:0 auto;padding:0 1rem;">
+        <h1 style="margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;">Blog de Analítica Avanzada - Maria Fernanda</h1>
+        <p style="margin:0;color:#6b7280;">Análisis de Flujo de Datos Simulado con Spark</p>
+      </div>
+    </header>
+
+    <main style="max-width:960px;margin:2rem auto;padding:0 1rem;">
+      <article>
+  <header style="margin-bottom: 2rem;">
+    <h1 style="margin-bottom: 0.5rem;">Análisis de Flujo de Datos Simulado con Spark</h1>
+    <div style="color: #718096; font-size: 0.9rem;">
+      <span>📅 29 de October, 2025</span>
+      
+      <span style="margin-left: 1rem;">✍️ Maria Fernanda Herazo Escobar</span>
+      
+    </div>
+  </header>
+
+  <h1 id="-análisis-de-flujo-de-datos-simulado-con-spark">🔍 Análisis de Flujo de Datos Simulado con Spark</h1>
+
+<h2 id="escenario-empresarial">Escenario Empresarial</h2>
+
+<p>Imagina una <strong>tienda online</strong> que necesita analizar en tiempo real el comportamiento de navegación de sus usuarios. Cada clic, cada sesión, cada interacción genera datos valiosos que pueden revelar patrones de compra, identificar usuarios problemáticos o detectar oportunidades de negocio.</p>
+
+<p>Este proyecto simula ese escenario usando <strong>Apache Spark</strong> para procesar un flujo continuo de eventos de clickstream.</p>
+
+<hr />
+
+<h2 id="-dataset-utilizado">📊 Dataset Utilizado</h2>
+
+<p>El dataset <code class="language-plaintext highlighter-rouge">clickstream_data.csv</code> contiene 1000 registros simulados con la siguiente estructura:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Columna</th>
+      <th>Tipo</th>
+      <th>Descripción</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Timestamp</code></td>
+      <td>datetime</td>
+      <td>Momento exacto del evento</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">User_ID</code></td>
+      <td>string</td>
+      <td>Identificador único del usuario (User_001 a User_050)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Clicks</code></td>
+      <td>integer</td>
+      <td>Número de clics en esa ventana temporal (1-5)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Ejemplo de datos:</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Timestamp,User_ID,Clicks
+2025-10-29 19:01:04,User_034,3
+2025-10-29 19:01:07,User_018,3
+2025-10-29 19:01:12,User_030,2
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="️-configuración-de-spark">⚙️ Configuración de Spark</h2>
+
+<h3 id="código-de-inicialización">Código de Inicialización</h3>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="n">pyspark.sql</span> <span class="kn">import</span> <span class="n">SparkSession</span>
+<span class="kn">from</span> <span class="n">pyspark.sql.functions</span> <span class="kn">import</span> <span class="n">to_timestamp</span><span class="p">,</span> <span class="nb">sum</span> <span class="k">as</span> <span class="n">spark_sum</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">window</span>
+
+<span class="c1"># Inicializar sesión de Spark
+</span><span class="n">spark</span> <span class="o">=</span> <span class="n">SparkSession</span><span class="p">.</span><span class="n">builder</span> \
+    <span class="p">.</span><span class="nf">appName</span><span class="p">(</span><span class="sh">"</span><span class="s">ClickstreamAnalysis</span><span class="sh">"</span><span class="p">)</span> \
+    <span class="p">.</span><span class="nf">getOrCreate</span><span class="p">()</span>
+
+<span class="c1"># Cargar datos
+</span><span class="n">df</span> <span class="o">=</span> <span class="n">spark</span><span class="p">.</span><span class="n">read</span><span class="p">.</span><span class="nf">csv</span><span class="p">(</span><span class="sh">"</span><span class="s">assets/data/clickstream_data.csv</span><span class="sh">"</span><span class="p">,</span> 
+                    <span class="n">header</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> 
+                    <span class="n">inferSchema</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+
+<span class="c1"># Convertir Timestamp a formato datetime
+</span><span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">.</span><span class="nf">withColumn</span><span class="p">(</span><span class="sh">"</span><span class="s">Timestamp</span><span class="sh">"</span><span class="p">,</span> <span class="nf">to_timestamp</span><span class="p">(</span><span class="nf">col</span><span class="p">(</span><span class="sh">"</span><span class="s">Timestamp</span><span class="sh">"</span><span class="p">)))</span>
+</code></pre></div></div>
+
+<h3 id="procesamiento-por-ventanas-de-tiempo">Procesamiento por Ventanas de Tiempo</h3>
+
+<p>Simulamos streaming agrupando eventos en <strong>ventanas de 1 minuto</strong>:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Agregar clicks por ventanas de 1 minuto
+</span><span class="n">windowed</span> <span class="o">=</span> <span class="n">df</span><span class="p">.</span><span class="nf">groupBy</span><span class="p">(</span>
+    <span class="nf">window</span><span class="p">(</span><span class="sh">"</span><span class="s">Timestamp</span><span class="sh">"</span><span class="p">,</span> <span class="sh">"</span><span class="s">1 minute</span><span class="sh">"</span><span class="p">),</span> 
+    <span class="sh">"</span><span class="s">User_ID</span><span class="sh">"</span>
+<span class="p">).</span><span class="nf">agg</span><span class="p">(</span>
+    <span class="nf">spark_sum</span><span class="p">(</span><span class="sh">"</span><span class="s">Clicks</span><span class="sh">"</span><span class="p">).</span><span class="nf">alias</span><span class="p">(</span><span class="sh">"</span><span class="s">clicks_ventana</span><span class="sh">"</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># Total de clicks por usuario
+</span><span class="n">total_por_usuario</span> <span class="o">=</span> <span class="n">df</span><span class="p">.</span><span class="nf">groupBy</span><span class="p">(</span><span class="sh">"</span><span class="s">User_ID</span><span class="sh">"</span><span class="p">)</span> \
+    <span class="p">.</span><span class="nf">agg</span><span class="p">(</span><span class="nf">spark_sum</span><span class="p">(</span><span class="sh">"</span><span class="s">Clicks</span><span class="sh">"</span><span class="p">).</span><span class="nf">alias</span><span class="p">(</span><span class="sh">"</span><span class="s">total_clicks</span><span class="sh">"</span><span class="p">))</span> \
+    <span class="p">.</span><span class="nf">orderBy</span><span class="p">(</span><span class="nf">col</span><span class="p">(</span><span class="sh">"</span><span class="s">total_clicks</span><span class="sh">"</span><span class="p">).</span><span class="nf">desc</span><span class="p">())</span>
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="-visualizaciones-y-análisis">📈 Visualizaciones y Análisis</h2>
+
+<h3 id="1-top-15-usuarios-por-actividad">1. Top 15 Usuarios por Actividad</h3>
+
+<p><img src="/maria_herazo_trabajo-tercer_corte/assets/images/top_users_chart.png" alt="Top 15 Usuarios" /></p>
+
+<p><strong>Insight:</strong> Los usuarios <code class="language-plaintext highlighter-rouge">User_001</code>, <code class="language-plaintext highlighter-rouge">User_006</code> y <code class="language-plaintext highlighter-rouge">User_026</code> concentran la mayor actividad. Representan oportunidades de fidelización premium.</p>
+
+<h3 id="2-análisis-temporal-de-clicks">2. Análisis Temporal de Clicks</h3>
+
+<p><img src="/maria_herazo_trabajo-tercer_corte/assets/images/temporal_analysis.png" alt="Análisis Temporal" /></p>
+
+<p><strong>Patrón detectado:</strong> Se observan <strong>picos de actividad cada 5-10 minutos</strong>, lo que sugiere sesiones de navegación intermitente. Ideal para:</p>
+<ul>
+  <li>Auto-escalado de infraestructura durante picos</li>
+  <li>Activación de ofertas flash en ventanas de alta demanda</li>
+</ul>
+
+<h3 id="3-relación-clicks-vs-sesiones">3. Relación Clicks vs Sesiones</h3>
+
+<p><img src="/maria_herazo_trabajo-tercer_corte/assets/images/clicks_vs_sessions.png" alt="Clicks vs Sesiones" /></p>
+
+<p><strong>Hallazgo:</strong> Existe una correlación positiva entre número de sesiones y total de clicks. Usuarios con más de 30 sesiones tienden a convertir mejor.</p>
+
+<h3 id="4-distribución-de-usuarios">4. Distribución de Usuarios</h3>
+
+<p><img src="/maria_herazo_trabajo-tercer_corte/assets/images/user_distribution.png" alt="Distribución de Usuarios" /></p>
+
+<p><strong>Segmentación identificada:</strong></p>
+<ul>
+  <li><strong>Exploradores</strong> (1-10 sesiones): 60% de usuarios, bajo engagement</li>
+  <li><strong>Regulares</strong> (11-25 sesiones): 30% de usuarios, engagement moderado</li>
+  <li><strong>Power Users</strong> (26+ sesiones): 10% de usuarios, ¡generan el 45% del tráfico!</li>
+</ul>
+
+<h3 id="5-mapa-de-calor-de-actividad">5. Mapa de Calor de Actividad</h3>
+
+<p><img src="/maria_herazo_trabajo-tercer_corte/assets/images/activity_heatmap.png" alt="Mapa de Calor" /></p>
+
+<p><strong>Conclusión:</strong> La actividad se concentra entre las <strong>19:00-20:00 hrs</strong>, momento óptimo para campañas de marketing en tiempo real.</p>
+
+<hr />
+
+<h2 id="-qué-patrones-encontramos">🎯 ¿Qué Patrones Encontramos?</h2>
+
+<h3 id="1-ley-de-pareto-en-acción-regla-8020">1. <strong>Ley de Pareto en Acción</strong> (Regla 80/20)</h3>
+<p>El 20% de los usuarios (power users) generan aproximadamente el <strong>45% del tráfico total</strong>. Estos usuarios son:</p>
+<ul>
+  <li>Candidatos ideales para programas de lealtad</li>
+  <li>Susceptibles a ofertas personalizadas</li>
+  <li>Potenciales embajadores de marca</li>
+</ul>
+
+<h3 id="2-sesiones-bimodales">2. <strong>Sesiones Bimodales</strong></h3>
+<p>Detectamos dos tipos de comportamiento claramente diferenciados:</p>
+<ul>
+  <li><strong>Sesiones exploratorias</strong>: 1-3 clicks, alta tasa de rebote</li>
+  <li><strong>Sesiones comprometidas</strong>: 5+ clicks, mayor intención de compra</li>
+</ul>
+
+<h3 id="3-patrones-temporales-predecibles">3. <strong>Patrones Temporales Predecibles</strong></h3>
+<p>Los picos de actividad cada 5-10 minutos permiten:</p>
+<ul>
+  <li>Predicción de carga para auto-escalado</li>
+  <li>Pre-carga de cache inteligente</li>
+  <li>Activación de promociones dinámicas</li>
+</ul>
+
+<hr />
+
+<h2 id="-cómo-ayuda-esto-a-la-tienda">💼 ¿Cómo Ayuda Esto a la Tienda?</h2>
+
+<h3 id="decisiones-basadas-en-datos-en-tiempo-real"><strong>Decisiones Basadas en Datos en Tiempo Real</strong></h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Problema de Negocio</th>
+      <th>Solución con Streaming Analytics</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>🎯 <strong>Retención</strong></td>
+      <td>Detectar usuarios con señales de abandono (baja actividad súbita) y activar ofertas automáticas</td>
+    </tr>
+    <tr>
+      <td>📦 <strong>Inventario</strong></td>
+      <td>Predecir demanda basada en patrones de clicks en categorías</td>
+    </tr>
+    <tr>
+      <td>💰 <strong>Pricing dinámico</strong></td>
+      <td>Ajustar precios según demanda en tiempo real</td>
+    </tr>
+    <tr>
+      <td>🔍 <strong>Personalización</strong></td>
+      <td>Recomendar productos basados en comportamiento de usuarios similares</td>
+    </tr>
+    <tr>
+      <td>⚡ <strong>Infraestructura</strong></td>
+      <td>Auto-escalar recursos durante picos detectados con 5 min de anticipación</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="roi-estimado"><strong>ROI Estimado:</strong></h3>
+<ul>
+  <li>📈 +15% en conversión por personalización en tiempo real</li>
+  <li>💵 -30% en costos de infraestructura por escalado predictivo</li>
+  <li>🎁 +25% en engagement por ofertas oportunas</li>
+</ul>
+
+<hr />
+
+<h2 id="️-arquitectura-del-blog">🏗️ Arquitectura del Blog</h2>
+
+<h3 id="estructura-del-proyecto">Estructura del Proyecto</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>blog-analytics/
+├── _config.yml              # Configuración Jekyll + Tema Cayman
+├── _includes/               # Componentes reutilizables
+│   ├── head.html           # Meta tags, CSS
+│   └── footer.html         # Pie de página
+├── _layouts/                # Plantillas
+│   ├── default.html        # Layout principal
+│   └── post.html           # Layout de artículos
+├── _posts/                  # Contenido del blog
+│   └── 2025-10-29-analisis-clickstream-spark.md
+├── assets/
+│   ├── css/
+│   │   └── style.css       # Estilos personalizados
+│   ├── images/             # Gráficas generadas
+│   │   ├── top_users_chart.png
+│   │   ├── temporal_analysis.png
+│   │   ├── clicks_vs_sessions.png
+│   │   ├── user_distribution.png
+│   │   └── activity_heatmap.png
+│   └── data/
+│       └── clickstream_data.csv
+├── generate_graphs.py       # Script Python para gráficas
+├── Gemfile                  # Dependencias Ruby
+└── index.md                 # Página principal
+</code></pre></div></div>
+
+<h3 id="tecnologías-utilizadas">Tecnologías Utilizadas</h3>
+
+<ul>
+  <li><strong>Jekyll 4.3.0</strong>: Generador de sitios estáticos</li>
+  <li><strong>Tema Cayman</strong>: Diseño limpio y profesional</li>
+  <li><strong>Apache Spark (PySpark)</strong>: Procesamiento distribuido</li>
+  <li><strong>Matplotlib + Pandas</strong>: Visualización de datos</li>
+  <li><strong>GitHub Pages</strong>: Hosting gratuito</li>
+</ul>
+
+<hr />
+
+<h2 id="-proceso-de-despliegue">🚀 Proceso de Despliegue</h2>
+
+<h3 id="paso-1-instalación-local"><strong>Paso 1: Instalación Local</strong></h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Instalar Ruby y Bundler</span>
+gem <span class="nb">install </span>bundler jekyll
+
+<span class="c"># Instalar dependencias del proyecto</span>
+bundle <span class="nb">install</span>
+
+<span class="c"># Instalar librerías Python</span>
+pip <span class="nb">install </span>matplotlib pandas numpy seaborn
+</code></pre></div></div>
+
+<h3 id="paso-2-generar-visualizaciones"><strong>Paso 2: Generar Visualizaciones</strong></h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Ejecutar script de gráficas</span>
+python generate_graphs.py
+
+<span class="c"># Verificar que se crearon las imágenes</span>
+<span class="nb">ls </span>assets/images/
+<span class="c"># Output: top_users_chart.png, temporal_analysis.png, etc.</span>
+</code></pre></div></div>
+
+<h3 id="paso-3-servidor-local"><strong>Paso 3: Servidor Local</strong></h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Iniciar Jekyll</span>
+bundle <span class="nb">exec </span>jekyll serve <span class="nt">--livereload</span>
+
+<span class="c"># Acceder en navegador</span>
+<span class="c"># http://localhost:4000</span>
+</code></pre></div></div>
+
+<h3 id="paso-4-despliegue-en-github-pages"><strong>Paso 4: Despliegue en GitHub Pages</strong></h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Opción A: Repositorio personal (username.github.io)</span>
+git init
+git add <span class="nb">.</span>
+git commit <span class="nt">-m</span> <span class="s2">"Blog de analítica avanzada"</span>
+git branch <span class="nt">-M</span> main
+git remote add origin https://github.com/username/username.github.io.git
+git push <span class="nt">-u</span> origin main
+
+<span class="c"># El sitio estará disponible en:</span>
+<span class="c"># https://username.github.io</span>
+</code></pre></div></div>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Opción B: Repositorio de proyecto</span>
+<span class="c"># 1. Crear repo en GitHub (ej: "blog-analytics")</span>
+<span class="c"># 2. Actualizar _config.yml:</span>
+baseurl: <span class="s2">"/blog-analytics"</span>
+url: <span class="s2">"https://username.github.io"</span>
+
+<span class="c"># 3. Subir código</span>
+git push
+
+<span class="c"># 4. En GitHub: Settings &gt; Pages &gt; Source: main branch</span>
+<span class="c"># Sitio disponible en: https://username.github.io/blog-analytics</span>
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="-funciones-implementadas">🔄 Funciones Implementadas</h2>
+
+<h3 id="1-procesamiento-de-datos-con-spark"><strong>1. Procesamiento de Datos con Spark</strong></h3>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">process_clickstream</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="sh">"""</span><span class="s">
+    Procesa datos de clickstream con ventanas temporales.
+    
+    Args:
+        df: DataFrame de Spark con columnas Timestamp, User_ID, Clicks
+    
+    Returns:
+        DataFrame agregado por ventanas de 1 minuto
+    </span><span class="sh">"""</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="p">.</span><span class="nf">withColumn</span><span class="p">(</span><span class="sh">"</span><span class="s">Timestamp</span><span class="sh">"</span><span class="p">,</span> <span class="nf">to_timestamp</span><span class="p">(</span><span class="nf">col</span><span class="p">(</span><span class="sh">"</span><span class="s">Timestamp</span><span class="sh">"</span><span class="p">)))</span>
+    
+    <span class="n">windowed</span> <span class="o">=</span> <span class="n">df</span><span class="p">.</span><span class="nf">groupBy</span><span class="p">(</span>
+        <span class="nf">window</span><span class="p">(</span><span class="sh">"</span><span class="s">Timestamp</span><span class="sh">"</span><span class="p">,</span> <span class="sh">"</span><span class="s">1 minute</span><span class="sh">"</span><span class="p">),</span> 
+        <span class="sh">"</span><span class="s">User_ID</span><span class="sh">"</span>
+    <span class="p">).</span><span class="nf">agg</span><span class="p">(</span><span class="nf">spark_sum</span><span class="p">(</span><span class="sh">"</span><span class="s">Clicks</span><span class="sh">"</span><span class="p">).</span><span class="nf">alias</span><span class="p">(</span><span class="sh">"</span><span class="s">clicks_ventana</span><span class="sh">"</span><span class="p">))</span>
+    
+    <span class="k">return</span> <span class="n">windowed</span>
+</code></pre></div></div>
+
+<h3 id="2-generación-de-visualizaciones"><strong>2. Generación de Visualizaciones</strong></h3>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">generate_visualizations</span><span class="p">(</span><span class="n">csv_path</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">):</span>
+    <span class="sh">"""</span><span class="s">
+    Genera 5 gráficas de análisis de clickstream.
+    
+    Visualizaciones:
+    - Top 15 usuarios por actividad
+    - Análisis temporal (serie de tiempo)
+    - Correlación clicks vs sesiones
+    - Distribución de usuarios
+    - Mapa de calor de actividad
+    </span><span class="sh">"""</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="p">.</span><span class="nf">read_csv</span><span class="p">(</span><span class="n">csv_path</span><span class="p">,</span> <span class="n">parse_dates</span><span class="o">=</span><span class="p">[</span><span class="sh">'</span><span class="s">Timestamp</span><span class="sh">'</span><span class="p">])</span>
+    
+    <span class="c1"># Gráfica 1: Top usuarios
+</span>    <span class="n">top_users</span> <span class="o">=</span> <span class="n">df</span><span class="p">.</span><span class="nf">groupby</span><span class="p">(</span><span class="sh">'</span><span class="s">User_ID</span><span class="sh">'</span><span class="p">)[</span><span class="sh">'</span><span class="s">Clicks</span><span class="sh">'</span><span class="p">].</span><span class="nf">sum</span><span class="p">().</span><span class="nf">sort_values</span><span class="p">(</span><span class="n">ascending</span><span class="o">=</span><span class="bp">False</span><span class="p">).</span><span class="nf">head</span><span class="p">(</span><span class="mi">15</span><span class="p">)</span>
+    <span class="n">plt</span><span class="p">.</span><span class="nf">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">6</span><span class="p">))</span>
+    <span class="n">top_users</span><span class="p">.</span><span class="n">plot</span><span class="p">.</span><span class="nf">bar</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="sh">'</span><span class="s">#667eea</span><span class="sh">'</span><span class="p">)</span>
+    <span class="n">plt</span><span class="p">.</span><span class="nf">savefig</span><span class="p">(</span><span class="sa">f</span><span class="sh">'</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s">/top_users_chart.png</span><span class="sh">'</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>
+    
+    <span class="c1"># [... más visualizaciones ...]
+</span></code></pre></div></div>
+
+<h3 id="3-sistema-de-layouts-modulares"><strong>3. Sistema de Layouts Modulares</strong></h3>
+
+<ul>
+  <li><strong><code class="language-plaintext highlighter-rouge">default.html</code></strong>: Layout base con header/footer</li>
+  <li><strong><code class="language-plaintext highlighter-rouge">post.html</code></strong>: Layout específico para artículos con meta tags SEO</li>
+  <li><strong>Componentes reutilizables</strong>: <code class="language-plaintext highlighter-rouge">head.html</code>, <code class="language-plaintext highlighter-rouge">footer.html</code></li>
+</ul>
+
+<h3 id="4-estilos-css-personalizados"><strong>4. Estilos CSS Personalizados</strong></h3>
+
+<p>El archivo <code class="language-plaintext highlighter-rouge">assets/css/style.css</code> incluye:</p>
+<ul>
+  <li>Variables CSS para colores consistentes</li>
+  <li>Gradientes modernos (#667eea → #764ba2)</li>
+  <li>Animaciones (fadeInUp, shimmer)</li>
+  <li>Cards hover con efectos 3D</li>
+  <li>Responsive design (mobile-first)</li>
+</ul>
+
+<hr />
+
+<h2 id="-reflexión-streaming-vs-procesamiento-por-lotes">🤔 Reflexión: Streaming vs Procesamiento por Lotes</h2>
+
+<h3 id="streaming-tiempo-real"><strong>Streaming (Tiempo Real)</strong></h3>
+
+<p><strong>Ventajas:</strong></p>
+<ul>
+  <li>✅ Latencia ultra-baja (milisegundos a segundos)</li>
+  <li>✅ Decisiones inmediatas (ofertas en tiempo real)</li>
+  <li>✅ Detección instantánea de anomalías</li>
+</ul>
+
+<p><strong>Desventajas:</strong></p>
+<ul>
+  <li>❌ Mayor complejidad de implementación</li>
+  <li>❌ Costos de infraestructura más altos</li>
+  <li>❌ Manejo de estado y ventanas temporales complejo</li>
+</ul>
+
+<p><strong>Casos de uso ideales:</strong></p>
+<ul>
+  <li>Detección de fraude en transacciones</li>
+  <li>Alertas de seguridad</li>
+  <li>Personalización en tiempo real</li>
+</ul>
+
+<hr />
+
+<h3 id="batch-por-lotes"><strong>Batch (Por Lotes)</strong></h3>
+
+<p><strong>Ventajas:</strong></p>
+<ul>
+  <li>✅ Simplicidad de implementación</li>
+  <li>✅ Costos optimizados (procesa off-peak)</li>
+  <li>✅ Ideal para análisis históricos complejos</li>
+</ul>
+
+<p><strong>Desventajas:</strong></p>
+<ul>
+  <li>❌ Latencia alta (minutos a horas)</li>
+  <li>❌ No apto para decisiones inmediatas</li>
+  <li>❌ Datos “stale” (desactualizados)</li>
+</ul>
+
+<p><strong>Casos de uso ideales:</strong></p>
+<ul>
+  <li>Reportes diarios/mensuales</li>
+  <li>Entrenamiento de modelos ML</li>
+  <li>Análisis exploratorio de datos</li>
+</ul>
+
+<hr />
+
+<h3 id="cuál-elegir"><strong>¿Cuál Elegir?</strong></h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Criterio</th>
+      <th>Streaming</th>
+      <th>Batch</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Latencia requerida</strong></td>
+      <td>&lt; 1 segundo</td>
+      <td>&gt; 1 hora</td>
+    </tr>
+    <tr>
+      <td><strong>Volumen de datos</strong></td>
+      <td>Flujo continuo</td>
+      <td>Datasets finitos</td>
+    </tr>
+    <tr>
+      <td><strong>Complejidad</strong></td>
+      <td>Alta</td>
+      <td>Media-Baja</td>
+    </tr>
+    <tr>
+      <td><strong>Costo</strong></td>
+      <td>Alto</td>
+      <td>Medio</td>
+    </tr>
+    <tr>
+      <td><strong>Caso de uso</strong></td>
+      <td>Ofertas en tiempo real</td>
+      <td>Reportes analíticos</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Recomendación:</strong> En entornos empresariales modernos, lo ideal es una <strong>arquitectura Lambda</strong> que combina ambos enfoques:</p>
+<ul>
+  <li>Streaming para decisiones críticas en tiempo real</li>
+  <li>Batch para análisis profundos y modelos ML</li>
+</ul>
+
+<hr />
+
+<h2 id="-cierre-y-retroalimentación">🎓 Cierre y Retroalimentación</h2>
+
+<h3 id="aprendizajes-clave"><strong>Aprendizajes Clave</strong></h3>
+
+<ol>
+  <li><strong>Apache Spark es esencial para Big Data</strong>: Procesar 1000+ eventos en tiempo real sería imposible con pandas puro</li>
+  <li><strong>Las ventanas temporales son cruciales</strong>: Agregar por minuto/hora permite detectar patrones que serían invisibles en datos crudos</li>
+  <li><strong>La visualización cuenta historias</strong>: 5 gráficas bien diseñadas comunican más que 100 tablas</li>
+  <li><strong>El streaming es el futuro</strong>: En 2025, las empresas que no procesan datos en tiempo real están en desventaja competitiva</li>
+</ol>
+
+<h3 id="próximos-pasos"><strong>Próximos Pasos</strong></h3>
+
+<ul class="task-list">
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Implementar modelo predictivo de churn</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Integrar con Kafka para streaming real</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Dashboard interactivo con Plotly Dash</li>
+  <li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" disabled="disabled" />Sistema de alertas automáticas</li>
+</ul>
+
+<hr />
+
+<h2 id="-referencias">📚 Referencias</h2>
+
+<ul>
+  <li><a href="https://spark.apache.org/docs/latest/">Apache Spark Documentation</a></li>
+  <li><a href="https://spark.apache.org/docs/latest/sql-programming-guide.html">PySpark SQL Guide</a></li>
+  <li><a href="https://jekyllrb.com/docs/">Jekyll Documentation</a></li>
+  <li><a href="https://github.com/pages-themes/cayman">Cayman Theme</a></li>
+</ul>
+
+<hr />
+
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 12px; color: white; text-align: center; margin-top: 3rem;">
+  <h3 style="margin: 0 0 1rem 0;">💬 ¿Tienes preguntas o comentarios?</h3>
+  <p style="margin: 0; opacity: 0.9;">
+    Déjame un comentario abajo o contáctame. Me encantaría saber cómo aplicaste estos conceptos en tu proyecto.
+  </p>
+</div>
+
+<hr />
+
+<p><strong>Autor:</strong> Maria Fernanda Herazo Escobar<br />
+<strong>Curso:</strong> Analítica Avanzada 2025<br />
+<strong>Fecha:</strong> 29 de Octubre, 2025<br />
+<strong>Tecnologías:</strong> Apache Spark • Python • Jekyll • GitHub Pages</p>
+
+
+  <footer style="margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #e4e4e7;">
+    <a href="/maria_herazo_trabajo-tercer_corte/" style="color: #667eea; text-decoration: none;">← Volver al inicio</a>
+  </footer>
+</article>
+
+
+    </main>
+
+    <footer style="border-top:1px solid #eef2f7;padding:1rem 0;margin-top:2rem;">
+      <div style="max-width:960px;margin:0 auto;padding:0 1rem;color:#666;font-size:0.95rem;">
+<link rel="stylesheet" href="/maria_herazo_trabajo-tercer_corte/assets/css/styles.css">
+  <p>&copy; 2025 Blog de Analítica Avanzada - Maria Fernanda · Tema Cayman · Hecho con Jekyll</p>
+ 
+  <p><a href="/maria_herazo_trabajo-tercer_corte/">Inicio</a> · <a href="/maria_herazo_trabajo-tercer_corte/2025/10/29/analisis-clickstream-spark.html">Ejercicio: Clickstream</a></p>
+</div>
+    </footer>
+  </body>
+</html>

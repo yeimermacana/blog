@@ -1,0 +1,37 @@
+---
+layout: default
+---
+
+<article>
+  <header style="margin-bottom: 2rem;">
+    <h1 style="margin-bottom: 0.5rem;">{{ page.title }}</h1>
+    <div style="color: #718096; font-size: 0.9rem;">
+      <span>📅 {{ page.date | date: "%d de %B, %Y" }}</span>
+      {% if page.author %}
+      <span style="margin-left: 1rem;">✍️ {{ page.author }}</span>
+      {% endif %}
+    </div>
+  </header>
+
+  {{ content }}
+
+  <footer style="margin-top: 3rem; padding-top: 2rem; border-top: 2px solid #e4e4e7;">
+    <a href="{{ '/' | relative_url }}" style="color: #667eea; text-decoration: none;">← Volver al inicio</a>
+  </footer>
+</article>
+
+{% if page.comments %}
+<div id="disqus_thread" style="margin-top: 3rem;"></div>
+<script>
+  var disqus_config = function () {
+    this.page.url = "{{ page.url | absolute_url }}";
+    this.page.identifier = "{{ page.id }}";
+  };
+  (function() {
+    var d = document, s = d.createElement('script');
+    s.src = 'https://tu-blog.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+  })();
+</script>
+{% endif %}
